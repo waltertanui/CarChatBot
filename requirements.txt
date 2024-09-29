@@ -3,8 +3,4 @@ gunicorn
 firebase-admin
 python-dotenv
 Flask-Cors
-# To install the required packages, run:
-# pip install -r requirements.txt
 
-# Alternatively, you can install each package individually:
-# pip install Flask gunicorn firebase-admin python-dotenv Flask-Cors
