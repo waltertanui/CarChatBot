@@ -1,3 +1,4 @@
+
 import os
 from dotenv import load_dotenv
 import firebase_admin
@@ -10,7 +11,7 @@ from flask_cors import CORS
 load_dotenv()
 
 # Initialize Firebase
-cred = credentials.Certificate("car-listing-website-firebase-adminsdk-7mba9-19d0eb73af.json")
+cred = credentials.Certificate("car-listing-website-firebase-adminsdk-7mba9-20e07c6a5f.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
