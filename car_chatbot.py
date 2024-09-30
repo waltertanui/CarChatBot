@@ -111,7 +111,7 @@ Image: {car.get('image', 'N/A')}
 
 # Flask app setup
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})  # This allows all origins for all routes
 
 @app.route('/', methods=['GET'])
 def home():
@@ -124,6 +124,7 @@ def chat():
     
     user_input = request.json['message']
 
+    print(f"Debug: Received message: {user_input}")
     # Process user input to extract preferences
     preferences = process_user_input(user_input)
 
