@@ -15,47 +15,46 @@ cred = credentials.Certificate("car-listing-website-firebase-adminsdk-7mba9-19d0
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Process user input to extract preferences
 def process_user_input(user_input):
     preferences = {}
-
+    
     # Extract fuel type
     fuel_types = ['electric', 'gasoline', 'petrol', 'hybrid']
     for fuel in fuel_types:
         if fuel in user_input.lower():
             preferences['fuel'] = fuel
             break
-
+    
     # Extract price
     price_match = re.search(r'\$?(\d+),?(\d+)?', user_input)
     if price_match:
         price = int(price_match.group(1) + (price_match.group(2) or ''))
         preferences['price'] = price
-
+    
     # Extract brand
     brands = ['BMW', 'Mercedes-Benz', 'Toyota', 'Nissan', 'Lamborghini', 'Hyundai']
     for brand in brands:
         if brand.lower() in user_input.lower():
             preferences['brand'] = brand
             break
-
+    
     # Extract car type
     car_types = ['SUV', 'Sedan', 'Truck', 'Convertible']
     for car_type in car_types:
         if car_type.lower() in user_input.lower():
             preferences['carType'] = car_type
             break
-
+    
     # Extract color
     colors = ['black', 'white', 'red', 'blue', 'green', 'silver', 'gray']
     for color in colors:
         if color in user_input.lower():
             preferences['color'] = color
             break
-
+    
+    print(f"Debug: Extracted preferences: {preferences}")
     return preferences
 
-# Query the Firestore database based on user preferences
 def query_database(preferences):
     cars_ref = db.collection('cars')
     query = cars_ref
@@ -63,29 +62,37 @@ def query_database(preferences):
     if 'fuel' in preferences:
         query = query.where('fuel', '==', preferences['fuel'].capitalize())
     if 'brand' in preferences:
-        query = query.where('brand', '==', preferences['brand'].capitalize())
+        brand_key = next((key for key in preferences if key.lower() == 'brand'), None)
+        if brand_key:
+            query = query.where('brand', '==', preferences[brand_key].capitalize())
     if 'carType' in preferences:
         query = query.where('carType', '==', preferences['carType'].capitalize())
     if 'color' in preferences:
         query = query.where('color', '==', preferences['color'].capitalize())
-
+    
     try:
         # Fetch cars based on the filtered query
         results = query.get()
         cars = [doc.to_dict() for doc in results]
+        
+        print(f"Debug: Query preferences: {preferences}")
+        print(f"Debug: Number of cars found: {len(cars)}")
+        if cars:
+            print(f"Debug: First car found: {cars[0]}")
+        else:
+            print("Debug: No cars found")
         return cars, None
 
     except Exception as e:
         print(f"Error querying database: {e}")
         return None, f"I'm sorry, but there was an error processing your request. Please try again later."
 
-# Filter cars based on price if provided
 def filter_cars(cars, preferences):
+    filtered_cars = cars
     if 'price' in preferences:
-        cars = [car for car in cars if float(car.get('price', 0)) <= float(preferences['price'])]
-    return cars
+        filtered_cars = [car for car in filtered_cars if float(car.get('price', 0)) <= float(preferences['price'])]
+    return filtered_cars
 
-# Format the car details for a readable response
 def format_car(car):
     return f"""
 {car.get('brand', 'N/A')} {car.get('name', 'N/A')}
@@ -101,49 +108,60 @@ VIN: {car.get('VIN', 'N/A')}
 Image: {car.get('image', 'N/A')}
 """
 
-# Flask app setup
+def chatbot():
+    print("Welcome to the Car Recommendation Chatbot!")
+    print("How can I help you find a car today?")
+    
+    while True:
+        user_input = input("You: ")
+        if user_input.lower() in ['quit', 'exit', 'bye']:
+            print("Thank you for using the Car Recommendation Chatbot. Goodbye!")
+            break
+        
+        preferences = process_user_input(user_input)
+        cars, error_message = query_database(preferences)
+        
+        if error_message:
+            print("Chatbot:", error_message)
+        elif not cars:
+            print("Chatbot: I'm sorry, I couldn't find any cars in our database. Please try a different query.")
+        else:
+            filtered_cars = filter_cars(cars, preferences)
+            if filtered_cars:
+                print(f"Chatbot: I found {len(filtered_cars)} car(s) matching your preferences. Here are up to 2 options:")
+                for i, car in enumerate(filtered_cars[:2], 1):  # Limit to 2 results
+                    print(f"\n{i}.", format_car(car))
+            else:
+                print("Chatbot: I couldn't find any cars exactly matching your preferences, but here are up to 2 options:")
+                for i, car in enumerate(cars[:2], 1):  # Show up to 2 cars from the database
+                    print(f"\n{i}.", format_car(car))
+
+if __name__ == "__main__":
+    chatbot()
+
 app = Flask(__name__)
 CORS(app)
 
-# Home route
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({"message": "Welcome to the Car Recommendation Chatbot API"}), 200
 
-# Chat route to handle user queries
 @app.route('/chat', methods=['POST'])
 def chat():
     if not request.json or 'message' not in request.json:
         return jsonify({"error": "Invalid request. 'message' field is required."}), 400
-
+    
     user_input = request.json['message']
-    
-    # Extract preferences from user input
-    preferences = process_user_input(user_input)
-    
-    # Query the database based on preferences
-    cars, error_message = query_database(preferences)
+    # Process the user input using your existing chatbot logic
+    response = process_user_input(user_input)
+    return jsonify({'response': response}), 200
 
-    if error_message:
-        return jsonify({"response": error_message}), 500
+def process_user_input(user_input):
+    # This function should contain your existing chatbot logic
+    # Extract preferences, query the database, generate response, etc.
+    # For now, let's return a placeholder response
+    return f"You said: {user_input}. This is a placeholder response."
 
-    if not cars:
-        return jsonify({"response": "I'm sorry, I couldn't find any cars in our database. Please try a different query."}), 200
-
-    # Filter cars based on price if applicable
-    filtered_cars = filter_cars(cars, preferences)
-
-    # Format the response
-    if filtered_cars:
-        response_message = f"I found {len(filtered_cars)} car(s) matching your preferences. Here are up to 2 options:"
-        car_details = "\n".join([format_car(car) for car in filtered_cars[:2]])  # Limit to 2 results
-    else:
-        response_message = "I couldn't find any cars exactly matching your preferences, but here are up to 2 options:"
-        car_details = "\n".join([format_car(car) for car in cars[:2]])  # Show up to 2 cars from the database
-
-    return jsonify({'response': f"{response_message}\n{car_details}"}), 200
-
-# Error handlers
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Not found"}), 404
